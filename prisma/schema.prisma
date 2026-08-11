@@ -1,0 +1,491 @@
+// AI Email Outreach & Automation Platform — Prisma schema.
+//
+// NOTE ON PROVIDER: this schema is committed with `provider = "sqlite"` so the
+// app runs with zero external services (local dev). PostgreSQL is the
+// production target: change the datasource provider to "postgresql", run
+// `npx prisma generate` + `npx prisma db push` (or migrate), and set
+// DATABASE_URL to a postgres://… connection string. No model changes required —
+// String-based statuses and Json fields are used throughout for portability.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & authorization
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  role      String   @default("USER") // USER | ADMIN
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  googleConnections GoogleConnection[]
+  mailboxes         Mailbox[]
+  spreadsheets      Spreadsheet[]
+  leads             Lead[]
+  campaigns         Campaign[]
+  templates         EmailTemplate[]
+  sequences         Sequence[]
+  aiRuns            AiRun[]
+  suppressions      Suppression[]
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+
+  @@map("users")
+}
+
+// A Google OAuth authorization granted by a user (mailbox + Sheets scopes).
+// Access/refresh tokens are stored AES-256-GCM encrypted (see lib/security/crypto).
+model GoogleConnection {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider      String    @default("google")
+  email         String // the connected Google account address
+  scopes        Json // array of granted OAuth scopes
+  accessToken   String // encrypted
+  refreshToken  String? // encrypted
+  tokenType     String?  @default("Bearer")
+  expiresAt     DateTime?
+  status        String    @default("CONNECTED") // CONNECTED | EXPIRED | REVOKED | ERROR
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  mailboxes     Mailbox[]
+  spreadsheets  Spreadsheet[]
+
+  @@unique([userId, email])
+  @@index([userId])
+  @@map("google_connections")
+}
+
+model Mailbox {
+  id                 String            @id @default(cuid())
+  userId             String
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleConnectionId String
+  googleConnection   GoogleConnection  @relation(fields: [googleConnectionId], references: [id], onDelete: Cascade)
+  emailAddress       String
+  isDefault          Boolean           @default(false)
+  status             String            @default("ACTIVE") // ACTIVE | EXPIRED | ERROR | DISCONNECTED
+  lastSyncedAt       DateTime?
+  lastError          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  campaigns Campaign[]
+  messages  Message[]
+
+  @@unique([userId, emailAddress])
+  @@index([userId])
+  @@index([googleConnectionId])
+  @@map("mailboxes")
+}
+
+// ---------------------------------------------------------------------------
+// Google Sheets integration
+// ---------------------------------------------------------------------------
+
+model Spreadsheet {
+  id                 String             @id @default(cuid())
+  userId             String
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleConnectionId String
+  googleConnection   GoogleConnection   @relation(fields: [googleConnectionId], references: [id], onDelete: Cascade)
+  spreadsheetId      String
+  title              String
+  url                String
+  lastSyncedAt       DateTime?
+
+  sheetMapping SheetMapping?
+  campaigns    Campaign[]
+
+  @@unique([userId, spreadsheetId])
+  @@index([userId])
+  @@index([googleConnectionId])
+  @@map("spreadsheets")
+}
+
+model SheetMapping {
+  id            String      @id @default(cuid())
+  spreadsheetId String      @unique
+  spreadsheet   Spreadsheet @relation(fields: [spreadsheetId], references: [id], onDelete: Cascade)
+  sheetName     String // worksheet/tab name
+  headerRow     Json // ordered array of column headers
+  fieldMapping  Json // { "Name": "firstName", "Email": "email", "Custom": "customFields.industry", ... }
+  importStatus  String      @default("NOT_IMPORTED") // NOT_IMPORTED | IMPORTED | IMPORTING
+  importedCount Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([spreadsheetId])
+  @@map("sheet_mappings")
+}
+
+// ---------------------------------------------------------------------------
+// Leads
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id                String         @id @default(cuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email             String
+  firstName         String?
+  lastName          String?
+  name              String?
+  company           String?
+  website           String?
+  location          String?
+  phone             String?
+  industry          String?
+  jobTitle          String?
+  customFields      Json // arbitrary mapped columns: { "industry": "...", "job_title": "..." }
+  tags              Json // array of strings
+  status            String         @default("NEW") // NEW | CONTACTED | REPLIED | INTERESTED | MEETING | NOT_INTERESTED | UNSUBSCRIBED | BOUNCED
+  lastContactedAt   DateTime?
+  lastReplyAt       DateTime?
+  aiIntent          String? // last classified intent
+  aiConfidence      Float?
+  notes             String?
+  suppressionStatus String         @default("ACTIVE") // ACTIVE | SUPPRESSED
+  source            String? // "google-sheets", "csv", "manual", "leadhunter"
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  campaignLeads CampaignLead[]
+  messages      Message[]
+  replies       Reply[]
+  aiReplies     AiReply[]
+  suppressions  Suppression[]
+
+  @@unique([userId, email])
+  @@index([userId])
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+// ---------------------------------------------------------------------------
+// Campaigns, templates, sequences
+// ---------------------------------------------------------------------------
+
+model Campaign {
+  id                String        @id @default(cuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  mailboxId         String?
+  mailbox           Mailbox?      @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
+  spreadsheetId     String?
+  spreadsheet       Spreadsheet?  @relation(fields: [spreadsheetId], references: [id], onDelete: SetNull)
+  sequenceId        String?
+  sequence          Sequence?     @relation(fields: [sequenceId], references: [id], onDelete: SetNull)
+  initialTemplateId String?
+  initialTemplate   EmailTemplate? @relation("InitialTemplate", fields: [initialTemplateId], references: [id], onDelete: SetNull)
+  leadSource        String? // "google-sheets" | "csv" | "manual"
+  status            String        @default("DRAFT") // DRAFT | SCHEDULED | RUNNING | PAUSED | COMPLETED | ARCHIVED
+  dailySendLimit    Int           @default(50)
+  timezone          String        @default("UTC")
+  workingHoursStart String        @default("09:00")
+  workingHoursEnd   String        @default("18:00")
+  sendDelayMin      Int           @default(60) // seconds
+  sendDelayMax      Int           @default(120) // seconds
+  scheduledStartAt  DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  replyMode         String        @default("APPROVAL") // APPROVAL | AUTO
+  autoReplyIntents  Json // intents allowed to auto-reply, e.g. ["PRICING_REQUEST","MEETING_REQUEST"]
+  settings          Json // extras: aiInstructions, tone, stopOnReply (default true), etc.
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  campaignLeads CampaignLead[]
+  messages      Message[]
+  replies       Reply[]
+  aiReplies     AiReply[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([mailboxId])
+  @@map("campaigns")
+}
+
+model CampaignLead {
+  id              String    @id @default(cuid())
+  campaignId      String
+  campaign        Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  leadId          String
+  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status          String    @default("PENDING") // PENDING | SENT | FOLLOW_UP_SCHEDULED | REPLIED | STOPPED | UNSUBSCRIBED | BOUNCED | SUPPRESSED
+  currentStepIndex Int      @default(0)
+  nextActionAt    DateTime?
+  lastSentAt      DateTime?
+  lastMessageId   String?
+  repliesCount    Int       @default(0)
+  isSuppressed    Boolean   @default(false)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  messages Message[]
+
+  @@unique([campaignId, leadId])
+  @@index([campaignId])
+  @@index([leadId])
+  @@index([nextActionAt])
+  @@map("campaign_leads")
+}
+
+model EmailTemplate {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  subject     String
+  body        String // supports {{variable}} placeholders
+  type        String        @default("INITIAL") // INITIAL | FOLLOW_UP | MANUAL
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  campaigns    Campaign[]   @relation("InitialTemplate")
+  sequenceSteps SequenceStep[]
+
+  @@index([userId])
+  @@map("email_templates")
+}
+
+model Sequence {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  steps    SequenceStep[]
+  campaigns Campaign[]
+
+  @@index([userId])
+  @@map("sequences")
+}
+
+model SequenceStep {
+  id            String        @id @default(cuid())
+  sequenceId    String
+  sequence      Sequence      @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  order         Int
+  delayDays     Int           @default(0)
+  templateId    String?
+  template      EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  subject       String? // fallback if no template
+  body          String? // fallback if no template
+  conditions    Json // { "stopOnReply": true, "stopOnBounce": true, ... }
+  createdAt     DateTime      @default(now())
+
+  @@unique([sequenceId, order])
+  @@index([sequenceId])
+  @@map("sequence_steps")
+}
+
+// ---------------------------------------------------------------------------
+// Messages, events, replies
+// ---------------------------------------------------------------------------
+
+model Message {
+  id              String          @id @default(cuid())
+  campaignId      String?
+  campaign        Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignLeadId  String?
+  campaignLead    CampaignLead?   @relation(fields: [campaignLeadId], references: [id], onDelete: SetNull)
+  leadId          String
+  lead            Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  mailboxId       String?
+  mailbox         Mailbox?        @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
+  direction       String          @default("SENT") // SENT | RECEIVED
+  subject         String?
+  body            String?
+  status          String          @default("QUEUED") // QUEUED | SENDING | SENT | DELIVERED | BOUNCED | FAILED | DRAFT
+  gmailMessageId  String?
+  gmailThreadId   String?
+  idempotencyKey  String?         @unique
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  error           String?
+  retries         Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  events   MessageEvent[]
+  replies  Reply[]
+
+  @@index([campaignId])
+  @@index([campaignLeadId])
+  @@index([leadId])
+  @@index([mailboxId])
+  @@index([gmailMessageId])
+  @@index([gmailThreadId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+model MessageEvent {
+  id         String   @id @default(cuid())
+  messageId  String
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  type       String // DELIVERED | BOUNCED | OPENED | CLICKED | REPLY | UNSUBSCRIBE
+  data       Json // provider-specific payload
+  occurredAt DateTime @default(now())
+
+  @@index([messageId])
+  @@index([type])
+  @@map("message_events")
+}
+
+model Reply {
+  id              String        @id @default(cuid())
+  messageId       String? // the outgoing message this replies to
+  message         Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  leadId          String
+  lead            Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaignId      String?
+  campaign        Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  threadId        String?
+  gmailMessageId  String?
+  senderEmail     String
+  subject         String?
+  body            String?
+  receivedAt      DateTime      @default(now())
+  intent          String? // AI classification result
+  confidence      Float?
+  status          String        @default("NEW") // NEW | CLASSIFIED | REVIEWING | SENT | IGNORED | ESCALATED
+  aiRunId         String?
+  processedAt     DateTime?
+
+  aiReply  AiReply?
+
+  @@unique([gmailMessageId])
+  @@index([leadId])
+  @@index([campaignId])
+  @@index([threadId])
+  @@index([receivedAt])
+  @@map("replies")
+}
+
+// ---------------------------------------------------------------------------
+// AI layer
+// ---------------------------------------------------------------------------
+
+model AiRun {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replyId     String? // when run for a reply classification/generation
+  type        String // CLASSIFY_REPLY | GENERATE_REPLY | GENERATE_SUBJECT | ANALYZE_LEAD
+  provider    String    @default("openai") // openai | demo
+  model       String?
+  input       Json // prompt metadata + context
+  output      Json? // structured result
+  status      String    @default("PENDING") // PENDING | SUCCESS | FAILED
+  error       String?
+  usage       Json? // tokens etc.
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([userId])
+  @@index([replyId])
+  @@index([createdAt])
+  @@map("ai_runs")
+}
+
+model AiReply {
+  id          String    @id @default(cuid())
+  replyId     String?   @unique
+  reply       Reply?    @relation(fields: [replyId], references: [id], onDelete: SetNull)
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  intent      String? // classification intent this draft addresses
+  confidence  Float?
+  draftText   String
+  status      String    @default("PENDING_REVIEW") // PENDING_REVIEW | APPROVED | SENT | REJECTED | FAILED | ESCALATED
+  escalation  String? // reason when ESCALATED
+  reviewedAt  DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([leadId])
+  @@index([campaignId])
+  @@index([status])
+  @@map("ai_replies")
+}
+
+// ---------------------------------------------------------------------------
+// Compliance & activity
+// ---------------------------------------------------------------------------
+
+model Suppression {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  reason    String   @default("UNSUBSCRIBE") // UNSUBSCRIBE | BOUNCE | COMPLAINT | MANUAL
+  source    String? // where the suppression came from
+  createdAt DateTime @default(now())
+
+  @@unique([userId, email])
+  @@index([userId])
+  @@index([email])
+  @@map("suppressions")
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // EMAIL_SENT | REPLY_RECEIVED | AI_CLASSIFIED | CAMPAIGN_STARTED | CAMPAIGN_PAUSED | SHEET_SYNCED | MAILBOX_EXPIRED | ...
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+  @@map("activity_logs")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // CAMPAIGN_COMPLETED | CAMPAIGN_ERROR | MAILBOX_EXPIRED | SHEET_SYNC_FAILED | AI_FAILED | HIGH_BOUNCE | REPLY_NEEDS_REVIEW
+  title     String
+  message   String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([readAt])
+  @@index([createdAt])
+  @@map("notifications")
+}
