@@ -6,9 +6,11 @@ emails through your Gmail via a background queue, detect replies, classify them
 with AI, generate human-approved reply drafts, sync statuses back to the sheet,
 and track everything on an analytics dashboard.
 
-> **Status:** Phase 1 complete — architecture, database, auth, dashboard shell,
-> and queue infrastructure. Later phases (Sheets, campaigns, sending, replies,
-> AI, analytics) land incrementally; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> **Status:** Phase 2 complete — Google OAuth mailbox connection (encrypted
+> token storage, auto-refresh), Google Sheets import (spreadsheet → column
+> mapping → dedupe-aware lead import), and a Sheet status-sync worker. Later
+> phases (campaigns, sending, replies, AI, analytics) land incrementally; see
+> [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ## Stack
 
