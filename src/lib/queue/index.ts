@@ -46,7 +46,7 @@ export interface QueueJob<T = unknown> {
 
 export type QueueHandler<T = unknown> = (
   job: QueueJob<T>,
-) => Promise<void> | void;
+) => Promise<unknown> | unknown;
 
 /**
  * Enqueue a job on the given queue.

@@ -107,6 +107,8 @@ model Spreadsheet {
   title              String
   url                String
   lastSyncedAt       DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   sheetMapping SheetMapping?
   campaigns    Campaign[]

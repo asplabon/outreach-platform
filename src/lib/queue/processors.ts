@@ -1,4 +1,8 @@
-import type { QueueHandler, QueueName } from "@/lib/queue";
+import { QUEUE_NAMES, type QueueHandler, type QueueJob, type QueueName } from "@/lib/queue";
+import {
+  syncCampaignStatus,
+  type SyncCampaignStatusJob,
+} from "@/lib/queue/processors/sheet-sync";
 
 /**
  * Registry of (queue, jobName) → handler. Shared by both execution modes:
@@ -18,12 +22,15 @@ function keyOf(queue: QueueName, jobName: string): string {
   return `${queue}:${jobName}`;
 }
 
-export function registerProcessor(
+export function registerProcessor<T>(
   queue: QueueName,
   jobName: string,
-  handler: QueueHandler,
+  handler: QueueHandler<T>,
 ): void {
-  handlers.set(keyOf(queue, jobName), handler);
+  // The registry stores handlers as QueueHandler<unknown>. This is a deliberate
+  // boundary cast: in Redis mode job data crosses the serialization boundary and
+  // processors narrow it to their own `QueueJob<T>` types at runtime.
+  handlers.set(keyOf(queue, jobName), handler as unknown as QueueHandler);
 }
 
 export function getProcessor(
@@ -71,8 +78,14 @@ function registerEmailProcessors(): void {}
 // Phase 5 (reply detection) registers its handlers here.
 function registerReplyProcessors(): void {}
 
-// Phase 2 (Sheet sync) registers its handlers here.
-function registerSheetSyncProcessors(): void {}
+// Phase 2 (Sheet sync): writes campaign lead statuses back to the source sheet.
+function registerSheetSyncProcessors(): void {
+  registerProcessor(
+    QUEUE_NAMES.sheetSync,
+    "sync-campaign-status",
+    (job: QueueJob<SyncCampaignStatusJob>) => syncCampaignStatus(job),
+  );
+}
 
 // Phase 6 (AI classification / reply generation) registers its handlers here.
 function registerAiProcessors(): void {}

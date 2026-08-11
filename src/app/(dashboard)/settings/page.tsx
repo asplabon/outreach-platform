@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { KeyRound, Mailbox, Bell, FileSpreadsheet } from "lucide-react";
 
 import { getCurrentUser } from "@/lib/auth/session";
@@ -92,13 +93,13 @@ export default async function SettingsPage() {
                 icon={Mailbox}
                 label="Mailboxes"
                 value={`${mailboxCount} connected`}
-                phase="Phase 2"
+                href="/mailboxes"
               />
               <IntegrationRow
                 icon={FileSpreadsheet}
                 label="Google Sheets"
                 value={`${spreadsheetCount} connected`}
-                phase="Phase 2"
+                href="/sheets"
               />
               <IntegrationRow
                 icon={KeyRound}
@@ -132,12 +133,14 @@ function IntegrationRow({
   icon: Icon,
   label,
   value,
+  href,
   phase,
 }: {
   icon: typeof Mailbox;
   label: string;
   value: string;
-  phase: string;
+  href?: string;
+  phase?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
@@ -150,7 +153,13 @@ function IntegrationRow({
           <p className="text-muted-foreground text-xs">{value}</p>
         </div>
       </div>
-      <Badge variant="outline">{phase}</Badge>
+      {href ? (
+        <Badge variant="outline" className="hover:bg-muted">
+          <Link href={href}>Manage</Link>
+        </Badge>
+      ) : phase ? (
+        <Badge variant="outline">{phase}</Badge>
+      ) : null}
     </div>
   );
 }
