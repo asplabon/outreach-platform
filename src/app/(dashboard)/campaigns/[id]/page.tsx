@@ -70,7 +70,7 @@ export default async function CampaignDetailPage({
         </div>
         <div className="flex gap-2">
           <CampaignDeleteButton campaignId={campaign.id} />
-          <Button variant="outline" render={<Link href={`/campaigns/${campaign.id}/edit`} />}>
+          <Button variant="outline" nativeButton={false} render={<Link href={`/campaigns/${campaign.id}/edit`} />}>
             Edit
           </Button>
         </div>

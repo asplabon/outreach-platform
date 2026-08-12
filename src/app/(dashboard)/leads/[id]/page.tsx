@@ -87,7 +87,7 @@ export default async function LeadDetailPage({
             </div>
           </div>
         </div>
-        <Button render={<Link href="/leads" />} variant="outline">
+        <Button nativeButton={false} render={<Link href="/leads" />} variant="outline">
           Back to leads
         </Button>
       </div>

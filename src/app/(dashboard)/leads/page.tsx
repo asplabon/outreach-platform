@@ -149,7 +149,7 @@ export default async function LeadsPage({
               variant="outline"
               size="sm"
               disabled={page <= 1}
-              render={<Link href={`/leads?${paginate(page - 1)}`} />}
+              nativeButton={false} render={<Link href={`/leads?${paginate(page - 1)}`} />}
             >
               <ChevronLeft />
               Previous
@@ -158,7 +158,7 @@ export default async function LeadsPage({
               variant="outline"
               size="sm"
               disabled={page >= totalPages}
-              render={<Link href={`/leads?${paginate(page + 1)}`} />}
+              nativeButton={false} render={<Link href={`/leads?${paginate(page + 1)}`} />}
             >
               Next
               <ChevronRight />

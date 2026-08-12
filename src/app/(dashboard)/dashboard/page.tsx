@@ -122,7 +122,7 @@ export default async function DashboardPage() {
               <CardTitle>Campaigns</CardTitle>
               <CardDescription>Your most recently updated campaigns</CardDescription>
             </div>
-            <Button variant="outline" size="sm" render={<Link href="/campaigns" />}>
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/campaigns" />}>
               View all
             </Button>
           </CardHeader>
@@ -134,7 +134,7 @@ export default async function DashboardPage() {
                   No campaigns yet. Create your first campaign when the
                   campaign builder ships.
                 </p>
-                <Button variant="outline" size="sm" render={<Link href="/campaigns" />}>
+                <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/campaigns" />}>
                   Campaigns
                 </Button>
               </div>

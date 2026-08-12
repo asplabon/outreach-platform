@@ -57,7 +57,7 @@ export default async function MailboxesPage({ searchParams }: MailboxesPageProps
           </p>
         </div>
         {googleConfigured ? (
-          <Button render={<a href="/api/google/connect" />}>
+          <Button nativeButton={false} render={<a href="/api/google/connect" />}>
             <Plus />
             Connect Gmail
           </Button>
@@ -171,7 +171,7 @@ export default async function MailboxesPage({ searchParams }: MailboxesPageProps
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="outline" render={<Link href="/sheets" />}>
+          <Button variant="outline" nativeButton={false} render={<Link href="/sheets" />}>
             Manage lead spreadsheets
           </Button>
         </CardContent>

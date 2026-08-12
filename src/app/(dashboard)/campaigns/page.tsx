@@ -50,7 +50,7 @@ export default async function CampaignsPage() {
             Multi-step outreach with pacing, replies and AI.
           </p>
         </div>
-        <Button render={<Link href="/campaigns/new" />}>
+        <Button nativeButton={false} render={<Link href="/campaigns/new" />}>
           <Plus />
           New campaign
         </Button>
@@ -110,7 +110,7 @@ export default async function CampaignsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        render={<Link href={`/campaigns/${campaign.id}/edit`} />}
+                        nativeButton={false} render={<Link href={`/campaigns/${campaign.id}/edit`} />}
                       >
                         Edit
                       </Button>

@@ -39,7 +39,7 @@ export default async function TemplatesPage() {
             Reusable emails with <code>{"{{variable}}"}</code> personalization.
           </p>
         </div>
-        <Button render={<Link href="/templates/new" />}>
+        <Button nativeButton={false} render={<Link href="/templates/new" />}>
           <Plus />
           New template
         </Button>
@@ -103,7 +103,7 @@ export default async function TemplatesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          render={<Link href={`/templates/${template.id}/edit`} />}
+                          nativeButton={false} render={<Link href={`/templates/${template.id}/edit`} />}
                         >
                           Edit
                         </Button>
