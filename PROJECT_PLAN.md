@@ -72,11 +72,21 @@ changed, DB changes, env vars, tests performed, and remaining work.
 - Scheduling: BullMQ repeatable jobs (workers/boot.ts) in Redis mode; dev
   interval in-process; manual `POST /api/replies/sync`.
 
-### Phase 6 — AI
-- Classify replies → structured JSON validated with Zod.
-- Generate reply drafts. Approval mode + Controlled Auto-Reply with strict
-  escalation rules (never auto-reply to unsubscribes / sensitive / low
-  confidence). AI Replies review page.
+### Phase 6 — AI ✅
+- `AIProvider` interface (classifyReply / generateReply) with `OpenAIProvider`
+  (lazy-loaded openai SDK, JSON response_format, Zod re-validation) and a
+  clearly-labeled `DemoProvider` (deterministic keyword heuristics, zero-network)
+  selected by `AI_PROVIDER=demo|openai`.
+- Classification pipeline (`ai:process-pending` + `ai:process-reply`):
+  `Reply` → Zod-validated intent/confidence/summary/escalation, recorded in
+  `ai_runs` (CLASSIFY_REPLY + GENERATE_REPLY), lead `aiIntent` updated.
+- Draft generation + routing: `decideSendRoute` (pure) — Approval mode → review;
+  Controlled Auto-Reply sends only when intent is allow-listed, confidence ≥
+  0.7, and nothing blocks it; unsubscribe / not-interested / model-flagged
+  always ESCALATE to a human and never auto-send.
+- AI Replies review page (`/ai-replies`) with intent/confidence/status badges,
+  original reply + draft preview, Approve (send in-thread) and Reject actions
+  (`POST /api/ai-replies/[id]/approve` / `reject`).
 
 ### Phase 7 — Analytics
 - Dashboard KPIs + charts, campaign funnel, activity feed, notifications,

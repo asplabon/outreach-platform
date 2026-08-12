@@ -6,18 +6,18 @@ emails through your Gmail via a background queue, detect replies, classify them
 with AI, generate human-approved reply drafts, sync statuses back to the sheet,
 and track everything on an analytics dashboard.
 
-> **Status:** Phase 5 complete — on top of the Phase 4 launch pipeline,
-> campaigns now support **multi-step follow-up sequences and reply detection**.
-> Attach a sequence (built in the new Sequences screens) to a campaign; each
-> initial send schedules the first follow-up, a due-follow-up dispatcher fires
-> them into the existing Gmail thread at the step's delay, and a reply-sync
-> worker scans the mailbox for inbound messages: real replies stop the sequence
-> (stop-on-reply), record a `Reply` for later AI classification, and auto-replies
-> are noted without interrupting; bounces and unsubscribes create suppression
-> rows and stop future contact. Status changes flow back to the source sheet.
-> Reply sync runs on a schedule (BullMQ repeatable job in Redis mode, a dev
-> interval otherwise) or on demand via `POST /api/replies/sync`. Phase 6 adds AI
-> classification + reply drafting; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> **Status:** Phase 6 complete — the AI reply layer now closes the loop. Each
+> inbound `Reply` is picked up by an `ai` queue worker, classified through an
+> `AIProvider` (`demo`, deterministic and zero-network, or `openai`) into a
+> Zod-validated intent with confidence and escalation, and drafted into an
+> `AiReply`. Every provider output is recorded in `ai_runs`. Routing follows
+> strict rules (`decideSendRoute`): **Approval mode** holds every draft on the
+> new **AI Replies** review page for human approve/reject; **Controlled
+> Auto-Reply mode** sends automatically only when the intent is allow-listed,
+> confidence is ≥ 0.7, and nothing blocks it — unsubscribe/not-interested and
+> model-flagged replies always escalate to a human and never auto-send. Approved
+> (or auto-sent) drafts go out in-thread via Gmail. Phase 7 adds analytics; see
+> [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ## Stack
 

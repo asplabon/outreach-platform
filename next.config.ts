@@ -8,8 +8,12 @@ const nextConfig: NextConfig = {
    * absent. Without this, the server bundle tries to resolve the package and
    * fails the build. Marking it external keeps the build green and lets the
    * runtime catch handle the missing module.
+   *
+   * The OpenAI SDK is loaded lazily by the AI provider (src/lib/ai) and only
+   * used when AI_PROVIDER=openai; keeping it external avoids bundling it into
+   * server chunks for demo-mode installs.
    */
-  serverExternalPackages: ["@valkey/valkey-glide"],
+  serverExternalPackages: ["@valkey/valkey-glide", "openai"],
 };
 
 export default nextConfig;

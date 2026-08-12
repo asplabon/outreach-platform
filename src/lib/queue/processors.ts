@@ -6,6 +6,7 @@ import {
 } from "@/lib/queue/processors/sheet-sync";
 import { registerEmailProcessors } from "@/lib/queue/processors/email";
 import { registerReplyProcessors } from "@/lib/queue/processors/reply";
+import { registerAiProcessors } from "@/lib/queue/processors/ai";
 
 /**
  * Registry of (queue, jobName) → handler. Shared by both execution modes:
@@ -74,8 +75,10 @@ function startDevPeriodic(): void {
     try {
       const { processDueFollowUps } = await import("@/lib/email/followup");
       const { syncRepliesForAllUsers } = await import("@/lib/replies/sync");
+      const { processPendingReplies } = await import("@/lib/ai/replies");
       await processDueFollowUps();
       await syncRepliesForAllUsers();
+      await processPendingReplies();
     } catch (error) {
       console.error("[queue] dev periodic tick failed:", error);
     }
@@ -132,5 +135,5 @@ function registerSheetSyncProcessors(): void {
   );
 }
 
-// Phase 6 (AI classification / reply generation) registers its handlers here.
-function registerAiProcessors(): void {}
+// Phase 6 (AI classification / reply generation) handlers are registered by the
+// imported registerAiProcessors (../queue/processors/ai.ts).

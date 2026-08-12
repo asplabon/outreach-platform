@@ -94,8 +94,15 @@ export async function scheduleRepeatableJobs(): Promise<BullQueue[]> {
     { name: "process-followups", data: {} },
   );
 
+  // AI reply pipeline: pick up new inbound replies waiting for classification.
+  await getQueue(QUEUE_NAMES.ai).upsertJobScheduler(
+    "ai-pending-scheduler",
+    { every: 60_000 },
+    { name: "process-pending", data: {} },
+  );
+
   console.log(
-    `[worker] repeatable jobs scheduled: reply sync (every ${env.REPLY_SYNC_INTERVAL_MINUTES}m), follow-up dispatch (every 1m)`,
+    `[worker] repeatable jobs scheduled: reply sync (every ${env.REPLY_SYNC_INTERVAL_MINUTES}m), follow-up dispatch (every 1m), AI pending replies (every 1m)`,
   );
   return [...queues.values()];
 }
