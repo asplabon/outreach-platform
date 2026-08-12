@@ -228,6 +228,48 @@ export function delayUntil(sendAt: Date, now: Date = new Date()): number {
   return Math.max(0, sendAt.getTime() - now.getTime());
 }
 
+export interface NextActionInput {
+  /** The instant the previous message in the sequence was sent. */
+  lastSentAt: Date;
+  /** Whole days of silence before the follow-up fires. */
+  delayDays: number;
+  settings: Pick<SendSettings, "timezone" | "workingHoursStart" | "workingHoursEnd">;
+  /** Reference "now" for clamping — defaults to the real clock. */
+  now?: Date;
+}
+
+/**
+ * When the next follow-up in a sequence should fire: `delayDays` whole days
+ * after `lastSentAt`, keeping the previous send's wall-clock time (in the
+ * campaign's timezone) so the cadence feels steady. The result is snapped
+ * forward so it never lands before "now" or the previous send, and always
+ * inside working hours.
+ */
+export function computeNextActionAt(input: NextActionInput): Date {
+  const { lastSentAt, delayDays, settings } = input;
+  const now = input.now ?? new Date();
+
+  // Recompute the shifted calendar date in tz so DST transitions don't drift
+  // the day, then reuse the previous send's hour/minute.
+  const sentParts = zonedParts(lastSentAt, settings.timezone);
+  const shifted = new Date(lastSentAt.getTime() + delayDays * 86_400_000);
+  const shiftedParts = zonedParts(shifted, settings.timezone);
+  let target = zonedToUtc(
+    { ...shiftedParts, hour: sentParts.hour, minute: sentParts.minute },
+    settings.timezone,
+  );
+
+  // Clamp: never before the previous send or before "now".
+  if (target.getTime() < lastSentAt.getTime()) target = lastSentAt;
+  if (target.getTime() < now.getTime()) target = now;
+
+  // Snap into the working window (start of next window if outside it).
+  if (!isWithinWorkingHours(target, settings)) {
+    target = nextWindowStart(target, settings);
+  }
+  return target;
+}
+
 /** Start of the day (00:00 in `timezone`) that `date` falls on, as an instant. */
 export function startOfDayInTimezone(date: Date, timezone: string): Date {
   const p = zonedParts(date, timezone);

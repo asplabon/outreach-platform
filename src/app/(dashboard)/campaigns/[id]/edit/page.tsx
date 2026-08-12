@@ -40,6 +40,7 @@ export default async function EditCampaignPage({
           mailboxId: campaign.mailboxId,
           spreadsheetId: campaign.spreadsheetId,
           initialTemplateId: campaign.initialTemplateId,
+          sequenceId: campaign.sequenceId,
           dailySendLimit: campaign.dailySendLimit,
           timezone: campaign.timezone,
           workingHoursStart: campaign.workingHoursStart,

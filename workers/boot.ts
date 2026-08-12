@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-import { Worker } from "bullmq";
+import { Worker, Queue as BullQueue } from "bullmq";
 
 import { getRedisConnection } from "@/lib/queue/connection";
 import {
@@ -8,7 +8,8 @@ import {
   getRegisteredJobNames,
   registerAllProcessors,
 } from "@/lib/queue/processors";
-import type { QueueName } from "@/lib/queue";
+import { QUEUE_NAMES, type QueueName } from "@/lib/queue";
+import { env } from "@/lib/env";
 
 /**
  * Boot the BullMQ worker for a single queue. Only starts a worker if at least
@@ -61,4 +62,40 @@ export async function bootWorker(queueName: QueueName): Promise<Worker | null> {
     `[worker] started: ${queueName} (processors: ${jobNames.join(", ")})`,
   );
   return worker;
+}
+
+/**
+ * Register BullMQ repeatable jobs that drive periodic work (Redis mode only —
+ * in-process dev uses a lighter interval inside the web process). Returns the
+ * handles so callers can close them on shutdown.
+ */
+export async function scheduleRepeatableJobs(): Promise<BullQueue[]> {
+  const queues = new Map<QueueName, BullQueue>();
+  const getQueue = (name: QueueName): BullQueue => {
+    let q = queues.get(name);
+    if (!q) {
+      q = new BullQueue(name, { connection: getRedisConnection() });
+      queues.set(name, q);
+    }
+    return q;
+  };
+
+  // Reply sync: scan Gmail threads for new replies every N minutes.
+  await getQueue(QUEUE_NAMES.reply).upsertJobScheduler(
+    "reply-sync-scheduler",
+    { every: env.REPLY_SYNC_INTERVAL_MINUTES * 60_000 },
+    { name: "sync-replies", data: {} },
+  );
+
+  // Follow-up dispatch: wake up due campaign leads every minute.
+  await getQueue(QUEUE_NAMES.email).upsertJobScheduler(
+    "followup-scheduler",
+    { every: 60_000 },
+    { name: "process-followups", data: {} },
+  );
+
+  console.log(
+    `[worker] repeatable jobs scheduled: reply sync (every ${env.REPLY_SYNC_INTERVAL_MINUTES}m), follow-up dispatch (every 1m)`,
+  );
+  return [...queues.values()];
 }

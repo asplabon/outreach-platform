@@ -1,4 +1,4 @@
-import { bootWorker } from "./boot";
+import { bootWorker, scheduleRepeatableJobs } from "./boot";
 import { QUEUE_NAMES } from "@/lib/queue";
 
 /**
@@ -9,18 +9,22 @@ import { QUEUE_NAMES } from "@/lib/queue";
  * there is nothing for a worker to consume.
  */
 async function main() {
-  const workers = await Promise.all(
-    Object.values(QUEUE_NAMES).map((name) => bootWorker(name)),
-  );
+  const [workers, periodicQueues] = await Promise.all([
+    Promise.all(
+      Object.values(QUEUE_NAMES).map((name) => bootWorker(name)),
+    ),
+    scheduleRepeatableJobs(),
+  ]);
 
   const started = workers.filter(Boolean).length;
   console.log(`[worker] all workers booted (${started} started). Ctrl+C to stop.`);
 
   const shutdown = async () => {
     console.log("[worker] shutting down...");
-    await Promise.all(
-      workers.filter(Boolean).map((w) => w?.close()),
-    );
+    await Promise.all([
+      ...workers.filter(Boolean).map((w) => w?.close()),
+      ...periodicQueues.map((q) => q.close()),
+    ]);
     process.exit(0);
   };
   process.on("SIGINT", shutdown);

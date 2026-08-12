@@ -66,6 +66,9 @@ export default async function CampaignDetailPage({
             {campaign.initialTemplate ? (
               <Badge variant="secondary">{campaign.initialTemplate.name}</Badge>
             ) : null}
+            {campaign.sequence ? (
+              <Badge variant="secondary">Sequence: {campaign.sequence.name}</Badge>
+            ) : null}
           </div>
         </div>
         <div className="flex gap-2">

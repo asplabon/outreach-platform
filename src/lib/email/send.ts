@@ -6,6 +6,7 @@ import {
   formatSender,
   renderMessage,
 } from "@/lib/email/render";
+import { computeNextActionAt } from "@/lib/email/schedule";
 import type { QueueJob } from "@/lib/queue";
 
 /** Job payload for a single initial email send. */
@@ -29,7 +30,7 @@ function encodeSubject(subject: string): string {
 }
 
 /** Build an RFC 5322 message and return its base64url-safe raw form. */
-function buildRawMessage(opts: {
+export function buildRawMessage(opts: {
   from: string;
   to: string;
   subject: string;
@@ -65,6 +66,7 @@ async function loadSendContext(campaignLeadId: string) {
     include: {
       mailbox: { include: { googleConnection: true } },
       initialTemplate: true,
+      sequence: { include: { steps: { orderBy: { order: "asc" } } } },
     },
   });
   if (!campaign) {
@@ -216,20 +218,34 @@ export async function sendInitialMessage(
       occurredAt: new Date(),
     },
   });
+  const sentAt = new Date();
+  // Schedule the first follow-up when the campaign has a sequence.
+  const steps = campaign.sequence?.steps ?? [];
+  const firstFollowUp = steps[0] ?? null;
   await prisma.campaignLead.update({
     where: { id: campaignLeadId },
     data: {
-      status: "SENT",
-      lastSentAt: new Date(),
+      status: firstFollowUp ? "FOLLOW_UP_SCHEDULED" : "SENT",
+      lastSentAt: sentAt,
       lastMessageId: message.id,
       currentStepIndex: 0,
-      nextActionAt: null,
+      nextActionAt: firstFollowUp
+        ? computeNextActionAt({
+            lastSentAt: sentAt,
+            delayDays: firstFollowUp.delayDays,
+            settings: {
+              timezone: campaign.timezone,
+              workingHoursStart: campaign.workingHoursStart,
+              workingHoursEnd: campaign.workingHoursEnd,
+            },
+          })
+        : null,
       updatedAt: new Date(),
     },
   });
   await prisma.lead.update({
     where: { id: campaignLead.leadId },
-    data: { lastContactedAt: new Date(), status: "CONTACTED" },
+    data: { lastContactedAt: sentAt, status: "CONTACTED" },
   });
   await logActivity(
     campaign.userId,

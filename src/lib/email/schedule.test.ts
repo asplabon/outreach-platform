@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  computeNextActionAt,
   computeSendTimes,
   isWithinWorkingHours,
   nextWindowStart,
@@ -122,5 +123,73 @@ describe("startOfDayInTimezone", () => {
     expect(
       startOfDayInTimezone(new Date("2026-01-05T15:00:00Z"), "America/New_York").toISOString(),
     ).toBe("2026-01-05T05:00:00.000Z");
+  });
+});
+
+describe("computeNextActionAt", () => {
+  const hours = { timezone: UTC, workingHoursStart: "09:00", workingHoursEnd: "18:00" };
+
+  it("fires delayDays after the previous send, within working hours", () => {
+    const lastSentAt = new Date("2026-01-05T10:00:00Z");
+    const result = computeNextActionAt({
+      lastSentAt,
+      delayDays: 3,
+      settings: hours,
+      now: lastSentAt,
+    });
+    // Jan 5 + 3 days = Jan 8, and 10:00 is within the window → same time.
+    expect(result.toISOString()).toBe("2026-01-08T10:00:00.000Z");
+  });
+
+  it("snaps to the next working-day start when the delay lands after hours", () => {
+    const lastSentAt = new Date("2026-01-05T16:00:00Z");
+    const result = computeNextActionAt({
+      lastSentAt,
+      delayDays: 1,
+      settings: hours,
+      now: lastSentAt,
+    });
+    // Jan 5 + 1 day = Jan 6 at 16:00 — within the window, keep it.
+    expect(result.toISOString()).toBe("2026-01-06T16:00:00.000Z");
+  });
+
+  it("rolls to the next window when the target lands before the window opens", () => {
+    const lastSentAt = new Date("2026-01-05T10:00:00Z");
+    const result = computeNextActionAt({
+      lastSentAt,
+      delayDays: 0,
+      settings: hours,
+      now: new Date("2026-01-06T07:00:00Z"),
+    });
+    // Clamped to now (07:00) then snapped to the window → 09:00.
+    expect(result.toISOString()).toBe("2026-01-06T09:00:00.000Z");
+  });
+
+  it("never schedules before the previous send (delayDays 0, same moment)", () => {
+    const lastSentAt = new Date("2026-01-05T10:00:00Z");
+    const result = computeNextActionAt({
+      lastSentAt,
+      delayDays: 0,
+      settings: hours,
+      now: lastSentAt,
+    });
+    expect(result.toISOString()).toBe("2026-01-05T10:00:00.000Z");
+  });
+
+  it("honours non-UTC timezones", () => {
+    const nyHours = {
+      timezone: "America/New_York",
+      workingHoursStart: "09:00",
+      workingHoursEnd: "18:00",
+    };
+    const lastSentAt = new Date("2026-01-05T15:00:00Z"); // 10:00 NY
+    const result = computeNextActionAt({
+      lastSentAt,
+      delayDays: 1,
+      settings: nyHours,
+      now: lastSentAt,
+    });
+    // Jan 5 10:00 NY + 1 day = Jan 6 10:00 NY = 15:00Z.
+    expect(result.toISOString()).toBe("2026-01-06T15:00:00.000Z");
   });
 });

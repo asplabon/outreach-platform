@@ -59,9 +59,18 @@ changed, DB changes, env vars, tests performed, and remaining work.
 - Retry + exponential backoff (BullMQ), message + message_events records,
   campaign launch / pause / resume (API + UI).
 
-### Phase 5 — Follow-ups + reply detection
-- Multi-step sequences with delays; stop-on-reply / suppress / bounce rules.
-- Reply-sync worker (Gmail thread matching), duplicate-reply prevention.
+### Phase 5 — Follow-ups + reply detection ✅
+- Sequence CRUD (lib, API routes, list/new/edit pages + step editor) and
+  campaign-form sequence select + validation.
+- Follow-up engine: `email:send-followup` (in-thread via threadId, Re: subject,
+  idempotency key, next-step scheduling / completion) + `email:process-followups`
+  due dispatcher; `computeNextActionAt` (lib/email/schedule).
+- Reply-sync worker (`reply:sync-replies`): Gmail thread matching,
+  auto-reply / bounce / unsubscribe heuristics (lib/replies/extract — pure),
+  dedupe on gmailMessageId, stop-on-reply, bounce + unsubscribe suppression,
+  sheet-sync enqueue.
+- Scheduling: BullMQ repeatable jobs (workers/boot.ts) in Redis mode; dev
+  interval in-process; manual `POST /api/replies/sync`.
 
 ### Phase 6 — AI
 - Classify replies → structured JSON validated with Zod.

@@ -36,6 +36,7 @@ export interface CampaignInput {
   mailboxId?: string | null;
   spreadsheetId?: string | null;
   initialTemplateId?: string | null;
+  sequenceId?: string | null;
   dailySendLimit?: number;
   timezone?: string;
   workingHoursStart?: string;
@@ -52,13 +53,14 @@ export interface CampaignFormOptions {
   mailboxes: { id: string; label: string }[];
   spreadsheets: { id: string; label: string }[];
   templates: { id: string; label: string }[];
+  sequences: { id: string; label: string }[];
 }
 
 /** Options to populate the campaign builder selects. */
 export async function getCampaignFormOptions(
   userId: string,
 ): Promise<CampaignFormOptions> {
-  const [mailboxes, spreadsheets, templates] = await Promise.all([
+  const [mailboxes, spreadsheets, templates, sequences] = await Promise.all([
     prisma.mailbox.findMany({
       where: { userId },
       orderBy: { createdAt: "asc" },
@@ -74,11 +76,17 @@ export async function getCampaignFormOptions(
       orderBy: { updatedAt: "desc" },
       select: { id: true, name: true },
     }),
+    prisma.sequence.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, name: true },
+    }),
   ]);
   return {
     mailboxes: mailboxes.map((m) => ({ id: m.id, label: m.emailAddress })),
     spreadsheets: spreadsheets.map((s) => ({ id: s.id, label: s.title })),
     templates: templates.map((t) => ({ id: t.id, label: t.name })),
+    sequences: sequences.map((s) => ({ id: s.id, label: s.name })),
   };
 }
 
@@ -106,6 +114,7 @@ export async function getCampaign(
       mailbox: { id: string; emailAddress: string } | null;
       spreadsheet: { id: string; title: string } | null;
       initialTemplate: { id: string; name: string } | null;
+      sequence: { id: string; name: string } | null;
     })
   | null
 > {
@@ -115,6 +124,7 @@ export async function getCampaign(
       mailbox: { select: { id: true, emailAddress: true } },
       spreadsheet: { select: { id: true, title: true } },
       initialTemplate: { select: { id: true, name: true } },
+      sequence: { select: { id: true, name: true } },
     },
   });
 }
@@ -123,7 +133,7 @@ export async function getCampaign(
  * Returns an error message or null when everything is fine. */
 export async function validateCampaignRefs(
   userId: string,
-  input: Pick<CampaignInput, "mailboxId" | "spreadsheetId" | "initialTemplateId">,
+  input: Pick<CampaignInput, "mailboxId" | "spreadsheetId" | "initialTemplateId" | "sequenceId">,
 ): Promise<string | null> {
   if (input.mailboxId) {
     const mailbox = await prisma.mailbox.findFirst({
@@ -146,6 +156,13 @@ export async function validateCampaignRefs(
     });
     if (!template) return "initialTemplateId is not yours or does not exist";
   }
+  if (input.sequenceId) {
+    const sequence = await prisma.sequence.findFirst({
+      where: { id: input.sequenceId, userId },
+      select: { id: true },
+    });
+    if (!sequence) return "sequenceId is not yours or does not exist";
+  }
   return null;
 }
 
@@ -161,6 +178,7 @@ export async function createCampaign(
       mailboxId: input.mailboxId ?? null,
       spreadsheetId: input.spreadsheetId ?? null,
       initialTemplateId: input.initialTemplateId ?? null,
+      sequenceId: input.sequenceId ?? null,
       dailySendLimit: input.dailySendLimit ?? 50,
       timezone: input.timezone ?? "UTC",
       workingHoursStart: input.workingHoursStart ?? "09:00",
@@ -189,6 +207,7 @@ export async function updateCampaign(
   if (input.spreadsheetId !== undefined) data.spreadsheetId = input.spreadsheetId;
   if (input.initialTemplateId !== undefined)
     data.initialTemplateId = input.initialTemplateId;
+  if (input.sequenceId !== undefined) data.sequenceId = input.sequenceId;
   if (input.dailySendLimit !== undefined) data.dailySendLimit = input.dailySendLimit;
   if (input.timezone !== undefined) data.timezone = input.timezone;
   if (input.workingHoursStart !== undefined)
@@ -309,6 +328,23 @@ export async function getCampaignValidation(
     detail: templateOk
       ? template!.name
       : "Pick an initial email template.",
+  });
+
+  const sequence = campaign.sequenceId
+    ? await prisma.sequence.findUnique({
+        where: { id: campaign.sequenceId },
+        select: { id: true, name: true, userId: true, steps: { select: { id: true } } },
+      })
+    : null;
+  const sequenceOk = sequence === null || sequence.userId === campaign.userId;
+  items.push({
+    label: "Follow-up sequence",
+    ok: sequenceOk,
+    detail: sequenceOk
+      ? sequence
+        ? `${sequence.name} (${sequence.steps.length} follow-up${sequence.steps.length === 1 ? "" : "s"})`
+        : "No sequence — single-message campaign"
+      : "Pick a sequence you own.",
   });
 
   const audience = await getCampaignAudience(campaign);

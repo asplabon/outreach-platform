@@ -6,14 +6,18 @@ emails through your Gmail via a background queue, detect replies, classify them
 with AI, generate human-approved reply drafts, sync statuses back to the sheet,
 and track everything on an analytics dashboard.
 
-> **Status:** Phase 4 complete — on top of leads, templates, and the campaign
-> builder, campaigns can now **launch**: the audience is linked, send times are
-> paced per the campaign's daily limit / working hours / timezone, and initial
-> emails go out through the user's Gmail via the email queue, each recorded as a
-> `Message` + `MessageEvent` with an idempotency key so re-launches can never
-> double-send. A campaign can be paused/resumed. Later phases (follow-ups,
-> replies, AI, analytics) land incrementally; see
-> [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> **Status:** Phase 5 complete — on top of the Phase 4 launch pipeline,
+> campaigns now support **multi-step follow-up sequences and reply detection**.
+> Attach a sequence (built in the new Sequences screens) to a campaign; each
+> initial send schedules the first follow-up, a due-follow-up dispatcher fires
+> them into the existing Gmail thread at the step's delay, and a reply-sync
+> worker scans the mailbox for inbound messages: real replies stop the sequence
+> (stop-on-reply), record a `Reply` for later AI classification, and auto-replies
+> are noted without interrupting; bounces and unsubscribes create suppression
+> rows and stop future contact. Status changes flow back to the source sheet.
+> Reply sync runs on a schedule (BullMQ repeatable job in Redis mode, a dev
+> interval otherwise) or on demand via `POST /api/replies/sync`. Phase 6 adds AI
+> classification + reply drafting; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ## Stack
 

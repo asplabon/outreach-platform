@@ -38,6 +38,7 @@ interface CampaignFormProps {
     mailboxId: string | null;
     spreadsheetId: string | null;
     initialTemplateId: string | null;
+    sequenceId: string | null;
     dailySendLimit: number;
     timezone: string;
     workingHoursStart: string;
@@ -52,6 +53,7 @@ interface CampaignFormProps {
   mailboxes: Option[];
   spreadsheets: Option[];
   templates: Option[];
+  sequences: Option[];
 }
 
 const TIMEZONES = [
@@ -75,6 +77,7 @@ export function CampaignForm({
   mailboxes,
   spreadsheets,
   templates,
+  sequences,
 }: CampaignFormProps) {
   const router = useRouter();
   const [name, setName] = useState(defaults?.name ?? "");
@@ -82,6 +85,9 @@ export function CampaignForm({
   const [mailboxId, setMailboxId] = useState(defaults?.mailboxId ?? "");
   const [spreadsheetId, setSpreadsheetId] = useState(defaults?.spreadsheetId ?? "");
   const [templateId, setTemplateId] = useState(defaults?.initialTemplateId ?? "");
+  const [sequenceId, setSequenceId] = useState<string | null>(
+    defaults?.sequenceId ?? null,
+  );
   const [dailySendLimit, setDailySendLimit] = useState(String(defaults?.dailySendLimit ?? 50));
   const [timezone, setTimezone] = useState(defaults?.timezone ?? "UTC");
   const [hoursStart, setHoursStart] = useState(defaults?.workingHoursStart ?? "09:00");
@@ -122,6 +128,7 @@ export function CampaignForm({
           mailboxId: mailboxId || null,
           spreadsheetId: spreadsheetId || null,
           initialTemplateId: templateId || null,
+          sequenceId: sequenceId || null,
           dailySendLimit: Number(dailySendLimit) || 50,
           timezone,
           workingHoursStart: hoursStart,
@@ -229,6 +236,22 @@ export function CampaignForm({
                 {templates.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
                     {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="campaign-sequence">Follow-up sequence</Label>
+            <Select value={sequenceId ?? "none"} onValueChange={(v) => setSequenceId(v === "none" ? null : v)}>
+              <SelectTrigger id="campaign-sequence">
+                <SelectValue placeholder={sequences.length ? "Choose a sequence" : "No sequences yet"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None — single message</SelectItem>
+                {sequences.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.label}
                   </SelectItem>
                 ))}
               </SelectContent>
