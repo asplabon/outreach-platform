@@ -88,9 +88,19 @@ changed, DB changes, env vars, tests performed, and remaining work.
   original reply + draft preview, Approve (send in-thread) and Reject actions
   (`POST /api/ai-replies/[id]/approve` / `reject`).
 
-### Phase 7 — Analytics
-- Dashboard KPIs + charts, campaign funnel, activity feed, notifications,
-  exportable reports.
+### Phase 7 — Analytics ✅
+- Analytics data layer (lib/analytics): KPI stats, 14-day send/reply trend
+  (pure `buildTrend` bucketing), per-campaign funnel, activity + notification
+  queries, and `toCsv` for export. All pure helpers unit-tested.
+- Dashboard home: KPI cards, Recharts send-volume area chart, recent-activity
+  feed, latest campaigns.
+- Analytics page: reply/bounce rates, trend chart, campaign funnel bars, CSV
+  export button (`/analytics`).
+- Activity page: event feed from `activity_logs` with type badges/icons, plus a
+  notifications panel (unread badge, mark-all-read via
+  `POST /api/notifications/read`).
+- Notifications wired into the pipeline: `REPLY_NEEDS_REVIEW` on AI escalation,
+  `CAMPAIGN_COMPLETED` when all leads finish/stop (`maybeCompleteCampaign`).
 
 ### Phase 8 — Security / hardening / production
 - Rate limiting, audit log, error-handling polish, integration tests,

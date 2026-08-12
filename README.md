@@ -6,18 +6,16 @@ emails through your Gmail via a background queue, detect replies, classify them
 with AI, generate human-approved reply drafts, sync statuses back to the sheet,
 and track everything on an analytics dashboard.
 
-> **Status:** Phase 6 complete — the AI reply layer now closes the loop. Each
-> inbound `Reply` is picked up by an `ai` queue worker, classified through an
-> `AIProvider` (`demo`, deterministic and zero-network, or `openai`) into a
-> Zod-validated intent with confidence and escalation, and drafted into an
-> `AiReply`. Every provider output is recorded in `ai_runs`. Routing follows
-> strict rules (`decideSendRoute`): **Approval mode** holds every draft on the
-> new **AI Replies** review page for human approve/reject; **Controlled
-> Auto-Reply mode** sends automatically only when the intent is allow-listed,
-> confidence is ≥ 0.7, and nothing blocks it — unsubscribe/not-interested and
-> model-flagged replies always escalate to a human and never auto-send. Approved
-> (or auto-sent) drafts go out in-thread via Gmail. Phase 7 adds analytics; see
-> [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> **Status:** Phase 7 complete — analytics now make the whole loop visible. The
+> **Dashboard** shows KPI cards, a 14-day send-vs-reply area chart (Recharts),
+> a recent-activity feed, and your latest campaigns. The **Analytics** page adds
+> reply rate / bounce rate / pending AI / active campaigns, the same trend
+> chart, a per-campaign funnel (total → sent → replied → interested), and a
+> one-click CSV export. The **Activity** page renders the event feed
+> (activity_logs) plus a notifications panel with unread counts and mark-all
+> read; notifications are now written for AI escalations (`REPLY_NEEDS_REVIEW`)
+> and campaign completion (`CAMPAIGN_COMPLETED`, when every lead finishes or
+> stops). Phase 8 covers hardening; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ## Stack
 

@@ -5,6 +5,7 @@ import { formatSender, buildRenderContext } from "@/lib/email/render";
 import { buildRawMessage } from "@/lib/email/send";
 import { enqueue, QUEUE_NAMES } from "@/lib/queue";
 import { getAiProvider } from "@/lib/ai/provider";
+import { notify } from "@/lib/analytics/analytics";
 import {
   AUTO_REPLY_MIN_CONFIDENCE,
   DEFAULT_AUTO_REPLY_INTENTS,
@@ -219,6 +220,15 @@ export async function processReply(replyId: string): Promise<ProcessReplyResult>
     `Reply from ${reply.lead.email} classified as ${classification.intent} (${Math.round(classification.confidence * 100)}%)`,
     { replyId: reply.id, campaignId: reply.campaignId, intent: classification.intent },
   );
+
+  if (route.status === "ESCALATED") {
+    await notify(
+      userId,
+      "REPLY_NEEDS_REVIEW",
+      "AI reply needs your review",
+      `${reply.lead.email} — ${classification.intent} (${Math.round(classification.confidence * 100)}%)`,
+    );
+  }
 
   if (route.status === "SENT") {
     await sendAiReply(aiReply.id, userId);

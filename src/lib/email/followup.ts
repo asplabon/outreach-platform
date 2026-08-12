@@ -8,6 +8,7 @@ import {
 } from "@/lib/email/render";
 import { buildRawMessage, type SendResult } from "@/lib/email/send";
 import { computeNextActionAt } from "@/lib/email/schedule";
+import { notify } from "@/lib/analytics/analytics";
 import { enqueue, QUEUE_NAMES, type QueueJob } from "@/lib/queue";
 
 /**
@@ -294,6 +295,9 @@ export async function sendFollowUpMessage(
           updatedAt: new Date(),
         },
   });
+  if (!nextStep) {
+    await maybeCompleteCampaign(campaign.id, campaign.userId, campaign.name);
+  }
   await prisma.lead.update({
     where: { id: campaignLead.leadId },
     data: { lastContactedAt: sentAt, status: "CONTACTED" },
@@ -326,5 +330,45 @@ async function logActivity(
     });
   } catch (error) {
     console.error("[followup] activity log failed:", error);
+  }
+}
+
+/** Campaign-lead statuses that mean "no more sends will happen". */
+const TERMINAL_LEAD_STATUSES = [
+  "REPLIED",
+  "STOPPED",
+  "UNSUBSCRIBED",
+  "BOUNCED",
+  "SUPPRESSED",
+  "COMPLETED",
+];
+
+/**
+ * If every campaign lead has finished its sequence (or stopped replying),
+ * mark the campaign COMPLETED and notify the owner. Idempotent.
+ */
+async function maybeCompleteCampaign(
+  campaignId: string,
+  userId: string,
+  campaignName: string,
+): Promise<void> {
+  try {
+    const active = await prisma.campaignLead.count({
+      where: { campaignId, status: { notIn: TERMINAL_LEAD_STATUSES } },
+    });
+    if (active > 0) return;
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: "COMPLETED", completedAt: new Date(), updatedAt: new Date() },
+    });
+    await logActivity(
+      userId,
+      "CAMPAIGN_COMPLETED",
+      `Campaign "${campaignName}" completed — all leads finished their sequence.`,
+      { campaignId },
+    );
+    await notify(userId, "CAMPAIGN_COMPLETED", "Campaign completed", campaignName);
+  } catch (error) {
+    console.error("[followup] maybeCompleteCampaign failed:", error);
   }
 }
