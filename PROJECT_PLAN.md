@@ -52,10 +52,12 @@ changed, DB changes, env vars, tests performed, and remaining work.
 - Campaign builder (lead source, mailbox, sequence, template, pacing).
 - Template editor with `{{variables}}`, live preview, validation.
 
-### Phase 4 — Gmail sending
-- BullMQ email queue + sending worker → Gmail API.
-- Idempotency keys, pacing / daily limits / working hours / timezone.
-- Retry + exponential backoff, message + message_events records.
+### Phase 4 — Gmail sending ✅
+- BullMQ email queue + sending worker → Gmail API (`email:send-initial`).
+- Idempotency keys (message idempotencyKey + deterministic job ids), pacing /
+  daily limits / working hours / timezone (lib/email/schedule).
+- Retry + exponential backoff (BullMQ), message + message_events records,
+  campaign launch / pause / resume (API + UI).
 
 ### Phase 5 — Follow-ups + reply detection
 - Multi-step sequences with delays; stop-on-reply / suppress / bounce rules.

@@ -49,3 +49,6 @@ prisma/test.db*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# dev logs
+.dev-log.txt

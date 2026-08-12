@@ -3,6 +3,7 @@ import {
   syncCampaignStatus,
   type SyncCampaignStatusJob,
 } from "@/lib/queue/processors/sheet-sync";
+import { registerEmailProcessors } from "@/lib/queue/processors/email";
 
 /**
  * Registry of (queue, jobName) → handler. Shared by both execution modes:
@@ -72,8 +73,8 @@ export function registerAllProcessors(): Map<QueueName, number> {
   return counts;
 }
 
-// Phase 4 (Gmail sending) registers its handlers here.
-function registerEmailProcessors(): void {}
+// Phase 4 (Gmail sending) handlers are registered by the imported
+// registerEmailProcessors (../queue/processors/email.ts).
 
 // Phase 5 (reply detection) registers its handlers here.
 function registerReplyProcessors(): void {}

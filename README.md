@@ -6,11 +6,14 @@ emails through your Gmail via a background queue, detect replies, classify them
 with AI, generate human-approved reply drafts, sync statuses back to the sheet,
 and track everything on an analytics dashboard.
 
-> **Status:** Phase 3 complete — leads (search/filter/sort/pagination/tags,
-> detail with notes and status), templates (editor with live
-> `{{variable}}` preview + validation), and campaign builder with a launch
-> readiness summary. Later phases (sending, replies, AI, analytics) land
-> incrementally; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> **Status:** Phase 4 complete — on top of leads, templates, and the campaign
+> builder, campaigns can now **launch**: the audience is linked, send times are
+> paced per the campaign's daily limit / working hours / timezone, and initial
+> emails go out through the user's Gmail via the email queue, each recorded as a
+> `Message` + `MessageEvent` with an idempotency key so re-launches can never
+> double-send. A campaign can be paused/resumed. Later phases (follow-ups,
+> replies, AI, analytics) land incrementally; see
+> [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ## Stack
 
